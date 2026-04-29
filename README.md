@@ -33,30 +33,6 @@ The built binary is a single executable that behaves as both:
 - `tailscaled`
 - `tailscale`
 
-## Why Standalone
-
-This repository started from experiments based on existing community projects, but it is kept standalone because the validated target, documentation, and build defaults are centered on older OpenWrt MIPS hardware rather than GL.iNet-specific ARM devices.
-
-## Requirements
-
-Build host:
-
-- `git`
-- `go`
-- `ssh`
-- `ssh-keygen`
-- `sftp`
-
-Optional:
-
-- `ssh-copy-id`
-- `upx`
-
-Router:
-
-- OpenWrt with `kmod-tun`
-- SSH access as `root`
-
 ## Usage
 
 Build:
@@ -73,6 +49,24 @@ The script will:
 3. build a stripped multicall binary
 4. compress it with `upx` if available
 5. optionally deploy it to the router over SSH
+
+## Install The Release Binary On OpenWrt
+
+Copy the `.combined` binary to the router and install it as both `tailscaled` and `tailscale`:
+
+```bash
+cp /tmp/tailscale-openwrt-mipsel-<version>.combined /usr/sbin/tailscale.combined
+chmod 755 /usr/sbin/tailscale.combined
+ln -sf /usr/sbin/tailscale.combined /usr/sbin/tailscaled
+ln -sf /usr/sbin/tailscale.combined /usr/sbin/tailscale
+```
+
+Make sure TUN support is installed:
+
+```bash
+opkg update
+opkg install kmod-tun
+```
 
 ## GitHub Releases
 
@@ -123,8 +117,6 @@ It does not intentionally omit Unix socket identity support, because doing so br
 - The packed binary may fit on small flash, but runtime RAM is still tight on 128MB routers.
 - In validation, `tailscaled` used about `27MB` RSS after startup, and total usable memory headroom was still limited.
 - If memory pressure is high, try running `tailscaled` with `GOGC=10`.
-- `/tmp` is RAM-backed and useful for testing state files, but not persistent.
-- `/var/lib/tailscale` or another persistent path is required if you want login state to survive reboot.
 
 ## Contributors And Credits
 
