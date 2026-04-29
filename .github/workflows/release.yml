@@ -1,0 +1,75 @@
+name: Build And Release
+
+on:
+  schedule:
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+    inputs:
+      tailscale_version:
+        description: 'Tailscale version tag, for example v1.96.5. Leave empty for latest stable.'
+        required: false
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: 'stable'
+
+      - name: Install UPX
+        run: sudo apt-get update && sudo apt-get install -y upx
+
+      - name: Determine Tailscale version
+        id: version
+        run: |
+          if [ -n "${{ github.event.inputs.tailscale_version }}" ]; then
+            VERSION="${{ github.event.inputs.tailscale_version }}"
+          else
+            VERSION=$(git ls-remote --refs --tags https://github.com/tailscale/tailscale.git 'v*' | awk '{print $2}' | sed 's#refs/tags/##' | grep -v pre | sort -V | tail -1)
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "version_short=${VERSION#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Check whether release already exists
+        id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "${{ steps.version.outputs.version }}" >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build release artifact
+        if: steps.check.outputs.exists == 'false'
+        env:
+          SELECTED_REF: ${{ steps.version.outputs.version }}
+        run: |
+          ./build.sh
+          mv out/tailscale.combined "tailscale-openwrt-mipsel-${{ steps.version.outputs.version_short }}.combined"
+
+      - name: Create release
+        if: steps.check.outputs.exists == 'false'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.version }}
+          name: Tailscale ${{ steps.version.outputs.version_short }} for OpenWrt MIPSel
+          body: |
+            Standalone `mipsel_24kc` build of Tailscale for constrained OpenWrt routers.
+
+            Notes:
+            - packed binary size is expected to be around 3.6MB
+            - validated runtime RSS was around 27MB after startup
+            - built from upstream `tailscale/tailscale` using this repository's stripped feature set
+          files: |
+            tailscale-openwrt-mipsel-${{ steps.version.outputs.version_short }}.combined

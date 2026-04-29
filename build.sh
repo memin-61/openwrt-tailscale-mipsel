@@ -3,6 +3,7 @@ set -euo pipefail
 
 OUTDIR="$(realpath "${OUTDIR:-./out}")"
 BIN="${BIN:-tailscale.combined}"
+DEPLOY="${DEPLOY:-0}"
 WORKDIR="$(mktemp -d)"
 trap 'rm -rf "$WORKDIR"' EXIT
 
@@ -17,9 +18,12 @@ require_cmd() {
 
 require_cmd git
 require_cmd go
-require_cmd ssh
-require_cmd ssh-keygen
-require_cmd sftp
+
+if [[ "$DEPLOY" == "1" ]]; then
+  require_cmd ssh
+  require_cmd ssh-keygen
+  require_cmd sftp
+fi
 
 TARGET="mipsel_24kc"
 GOARCH="mipsle"
@@ -37,6 +41,10 @@ SSH_OPTS=(
 )
 
 choose_ref() {
+  if [[ -n "${SELECTED_REF:-}" ]]; then
+    return 0
+  fi
+
   local choice
   local -a refs
   local i
@@ -207,12 +215,19 @@ main() {
   build_binary
   echo "Built: $OUTDIR/$BIN"
 
-  read -r -p "Deploy to router now? [y/N]: " deploy_now
-  case "${deploy_now:-N}" in
-    y|Y|yes|YES)
-      deploy_router
-      ;;
-  esac
+  if [[ "$DEPLOY" == "1" ]]; then
+    deploy_router
+    return 0
+  fi
+
+  if [[ -t 0 ]]; then
+    read -r -p "Deploy to router now? [y/N]: " deploy_now
+    case "${deploy_now:-N}" in
+      y|Y|yes|YES)
+        deploy_router
+        ;;
+    esac
+  fi
 }
 
 main "$@"
