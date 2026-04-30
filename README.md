@@ -68,24 +68,6 @@ opkg update
 opkg install kmod-tun
 ```
 
-## GitHub Releases
-
-This repository can publish release artifacts with GitHub Actions.
-
-The workflow:
-
-- checks for the latest stable upstream Tailscale tag every Monday
-- can also be triggered manually from the Actions tab
-- builds the stripped `mipsel_24kc` binary
-- compresses it with `upx`
-- publishes a GitHub release asset named like:
-
-```text
-tailscale-openwrt-mipsel-<version>.combined
-```
-
-The release asset is the packed multicall binary, not an `.ipk` package.
-
 ## MIPS Build Details
 
 The validated build uses:
